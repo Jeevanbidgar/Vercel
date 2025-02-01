@@ -1,47 +1,38 @@
 import json
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.parse import urlparse, parse_qs
+from http.server import BaseHTTPRequestHandler
+import urllib.parse
 
+# Load student data from the JSON file
+def load_data():
+    with open('q-vercel-python.json', 'r') as file:
+        data = json.load(file)
+    return data
+
+# Handler class to process incoming requests
 class handler(BaseHTTPRequestHandler):
-
     def do_GET(self):
-        self.send_response(200)  # OK
+        # Parse the query parameters
+        query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+
+        # Get 'name' parameters from the query string
+        names = query.get('name', [])
+
+        # Load data from the JSON file
+        data = load_data()
+
+        # Prepare the result dictionary
+        result = {"marks": []}
+        for name in names:
+            # Find the marks for each name
+            for entry in data:
+                if entry["name"] == name:
+                    result["marks"].append(entry["marks"])
+
+        # Send the response header
+        self.send_response(200)
         self.send_header('Content-type', 'application/json')
-        self.send_header('Access-Control-Allow-Origin', '*')  # Enable CORS for all origins
+        self.send_header('Access-Control-Allow-Origin', '*')  # Enable CORS for any origin
         self.end_headers()
 
-        parsed_url = urlparse(self.path)
-        query_params = parse_qs(parsed_url.query)
-
-        names = query_params.get('name', [])  # Get a list of names
-
-        try:
-            with open('q-vercel-python.json', 'r') as f:
-                student_data = json.load(f)
-
-            marks = []
-            for name in names:
-                mark = student_data.get(name)
-                if mark is not None:
-                    marks.append(mark)
-                else:
-                    marks.append(0) # Or handle the case where the name isn't found
-
-            response_data = {"marks": marks}
-            self.wfile.write(json.dumps(response_data).encode())
-
-        except FileNotFoundError:
-            self.send_error(404, "Data file not found")
-        except json.JSONDecodeError:
-            self.send_error(500, "Invalid JSON data")
-        except Exception as e:
-            self.send_error(500, f"An error occurred: {e}")
-
-
-def main():
-    server_address = ('', 3000)
-    httpd = HTTPServer(server_address, handler)
-    httpd.serve_forever()
-
-if __name__ == "__main__":
-    main()
+        # Send the JSON response
+        self.wfile.write(json.dumps(result).encode('utf-8'))
